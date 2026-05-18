@@ -1,37 +1,30 @@
-'use strict';
+"use strict";
 
-const transcriptionService = require('./transcription.service');
-const parserService = require('./parser.service');
-const productRepository = require('../products/product.repository');
-const inventoryService = require('../inventory/inventory.service');
-const logger = require('../../utils/logger');
-const { TRANSACTION_SOURCES } = require('../../constants/inventory');
+const transcriptionService = require("./transcription.service");
+const parserService = require("./parser.service");
+const productResolver = require("./product-resolver.service");
+const inventoryService = require("../inventory/inventory.service");
+const logger = require("../../utils/logger");
+const { TRANSACTION_SOURCES } = require("../../constants/inventory");
 
-const matchProduct = async (workspaceId, name) => {
-  if (!name) return null;
-  const exact = await productRepository.findByName(workspaceId, name);
-  if (exact) return exact;
+const toRecordPayload = (line) => ({
+  productId: line.product._id,
+  type: line.raw.type,
+  quantity: line.raw.quantity,
+  note: line.raw.note,
+  metadata: {
+    aliases: line.raw.aliases,
+    unit: line.raw.unit,
+    autoCreated: line.created,
+  },
+});
 
-  const { items } = await productRepository.list(workspaceId, {
-    skip: 0,
-    limit: 1,
-    search: name,
-  });
-  return items[0] || null;
-};
-
-const buildLineItems = async (workspaceId, parsedItems) => {
-  const results = [];
-  for (const item of parsedItems) {
-    const product = await matchProduct(workspaceId, item.product);
-    results.push({
-      raw: item,
-      product,
-      matched: Boolean(product),
-    });
-  }
-  return results;
-};
+const toUnresolved = (line) => ({
+  product: line.raw.product,
+  quantity: line.raw.quantity,
+  type: line.raw.type,
+  unit: line.raw.unit,
+});
 
 const processTranscript = async ({
   workspaceId,
@@ -40,17 +33,13 @@ const processTranscript = async ({
   createdBy,
 }) => {
   const parsed = await parserService.parseInventoryMessage(text);
-  const matched = await buildLineItems(workspaceId, parsed.items);
+  const resolved = await productResolver.resolveItems(
+    workspaceId,
+    parsed.items,
+  );
 
-  const recordable = matched
-    .filter((m) => m.matched)
-    .map((m) => ({
-      productId: m.product._id,
-      type: m.raw.type,
-      quantity: m.raw.quantity,
-      note: m.raw.note,
-      metadata: { aliases: m.raw.aliases, unit: m.raw.unit },
-    }));
+  const withProduct = resolved.filter((line) => line.product);
+  const recordable = withProduct.map(toRecordPayload);
 
   const recordResults = recordable.length
     ? await inventoryService.recordBatch({
@@ -62,18 +51,20 @@ const processTranscript = async ({
       })
     : [];
 
-  const unresolved = matched
-    .filter((m) => !m.matched)
-    .map((m) => ({
-      product: m.raw.product,
-      quantity: m.raw.quantity,
-      type: m.raw.type,
-      unit: m.raw.unit,
+  const unresolved = resolved.filter((line) => !line.product).map(toUnresolved);
+  const createdProducts = withProduct
+    .filter((line) => line.created)
+    .map((line) => ({
+      name: line.product.name,
+      quantity: line.raw.quantity,
+      type: line.raw.type,
+      unit: line.raw.unit,
     }));
 
-  logger.info('AI processed transcript', {
+  logger.info("AI processed transcript", {
     workspaceId: workspaceId.toString(),
-    recorded: recordResults.filter((r) => r.status === 'ok').length,
+    recorded: recordResults.filter((r) => r.status === "ok").length,
+    created: createdProducts.length,
     unresolved: unresolved.length,
   });
 
@@ -83,14 +74,19 @@ const processTranscript = async ({
     summary: parsed.summary,
     parsedItems: parsed.items,
     recordResults,
+    createdProducts,
     unresolved,
   };
 };
 
-const processVoice = async ({ workspaceId, audioBuffer, filename, language, createdBy }) => {
+const processVoice = async ({
+  workspaceId,
+  audioBuffer,
+  filename,
+  createdBy,
+}) => {
   const text = await transcriptionService.transcribeBuffer(audioBuffer, {
     filename,
-    language,
   });
   return processTranscript({
     workspaceId,

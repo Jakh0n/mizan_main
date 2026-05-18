@@ -1,21 +1,21 @@
-'use strict';
+"use strict";
 
-const env = require('../../config/env');
-const { getClient } = require('./openai.client');
-const logger = require('../../utils/logger');
-const { TRANSACTION_TYPE_VALUES } = require('../../constants/inventory');
+const env = require("../../config/env");
+const { getClient } = require("./openai.client");
+const logger = require("../../utils/logger");
+const { TRANSACTION_TYPE_VALUES } = require("../../constants/inventory");
 
 const SYSTEM_PROMPT = `You are an expert inventory assistant for restaurants, cafes, markets and warehouses.
-You receive natural language messages (often spoken) in multiple languages (English, Russian, Uzbek, etc.).
+You receive natural language messages (often spoken) in Uzbek, Turkish, Russian, English, and other languages.
 Your job is to extract every inventory event mentioned and return STRICT JSON only.
 
 Output schema:
 {
-  "language": "<detected language code, e.g. en, ru, uz>",
+  "language": "<detected language code, e.g. en, ru, uz, tr>",
   "items": [
     {
       "product": "<product name in lowercase>",
-      "aliases": ["<original spoken name>"],
+      "aliases": ["<original spoken name variants>"],
       "type": "in" | "out" | "adjust",
       "quantity": <positive number>,
       "unit": "pcs" | "kg" | "g" | "l" | "ml" | "box" | "pack",
@@ -26,10 +26,13 @@ Output schema:
 }
 
 Rules:
-- "in" means stock received / purchased / arrived / delivered.
-- "out" means stock sold / used / consumed / removed.
+- "in" = stock received, purchased, arrived, delivered.
+  Uzbek/Turkish examples mapped to "in": oldim, oldik, sotib oldim, keldi, keltirdim, keldim, geldi, aldim, satın aldım, aldik.
+- "out" = stock sold, used, consumed, removed.
+  Uzbek/Turkish examples mapped to "out": sotildi, sotdik, ishlatildi, ishlatdik, sarf qilindi, tükendi, bitti.
 - "adjust" only when user explicitly sets a stock level.
-- Normalize quantities to numbers (e.g. "two and a half" -> 2.5).
+- Use the most common product name (e.g. ekmek, non, kola, sut, et, go'sht).
+- Normalize quantities to numbers (e.g. "ikki yuz" -> 200, "yuz" -> 100).
 - If no items detected, return { "language": "..", "items": [], "summary": ".." }.
 - Never include any text outside the JSON.`;
 
@@ -50,7 +53,7 @@ const safeParse = (raw) => {
 
 const normalizeItem = (item) => {
   if (!item || !item.product) return null;
-  const type = TRANSACTION_TYPE_VALUES.includes(item.type) ? item.type : 'in';
+  const type = TRANSACTION_TYPE_VALUES.includes(item.type) ? item.type : "in";
   const quantity = Number(item.quantity);
   if (!Number.isFinite(quantity) || quantity <= 0) return null;
   return {
@@ -58,42 +61,42 @@ const normalizeItem = (item) => {
     aliases: Array.isArray(item.aliases) ? item.aliases : [],
     type,
     quantity,
-    unit: item.unit || 'pcs',
-    note: item.note || '',
+    unit: item.unit || "pcs",
+    note: item.note || "",
   };
 };
 
 const parseInventoryMessage = async (text) => {
   if (!text || !text.trim()) {
-    return { language: 'unknown', items: [], summary: '' };
+    return { language: "unknown", items: [], summary: "" };
   }
 
   const client = getClient();
   const completion = await client.chat.completions.create({
     model: env.openai.chatModel,
     temperature: 0,
-    response_format: { type: 'json_object' },
+    response_format: { type: "json_object" },
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: text },
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: text },
     ],
   });
 
-  const raw = completion.choices?.[0]?.message?.content || '';
+  const raw = completion.choices?.[0]?.message?.content || "";
   const parsed = safeParse(raw) || {};
   const items = Array.isArray(parsed.items)
     ? parsed.items.map(normalizeItem).filter(Boolean)
     : [];
 
-  logger.debug('AI parsed inventory message', {
+  logger.debug("AI parsed inventory message", {
     itemCount: items.length,
     language: parsed.language,
   });
 
   return {
-    language: parsed.language || 'unknown',
+    language: parsed.language || "unknown",
     items,
-    summary: parsed.summary || '',
+    summary: parsed.summary || "",
   };
 };
 

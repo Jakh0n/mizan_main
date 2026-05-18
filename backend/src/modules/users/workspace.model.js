@@ -17,6 +17,7 @@ const workspaceSchema = new mongoose.Schema(
     settings: {
       lowStockThreshold: { type: Number, default: 5, min: 0 },
       currencySymbol: { type: String, default: '$' },
+      autoCreateProducts: { type: Boolean, default: true },
     },
   },
   { timestamps: true }

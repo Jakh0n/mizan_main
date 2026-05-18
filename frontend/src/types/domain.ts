@@ -18,6 +18,7 @@ export interface Workspace {
   settings: {
     lowStockThreshold: number;
     currencySymbol: string;
+    autoCreateProducts?: boolean;
   };
   createdAt: string;
   updatedAt: string;
@@ -124,5 +125,11 @@ export interface AiProcessResult {
     | { status: 'ok'; transaction: InventoryTransaction; product: Product }
     | { status: 'error'; error: string }
   >;
+  createdProducts: Array<{
+    name: string;
+    quantity: number;
+    type: TransactionType;
+    unit: Unit;
+  }>;
   unresolved: Array<{ product: string; quantity: number; type: TransactionType; unit: Unit }>;
 }

@@ -1,22 +1,28 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Loader2, Sparkles } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { useParseText } from '../hooks/useAi';
-import type { AiProcessResult } from '@/types/domain';
+import { useState } from "react";
+import { Loader2, Sparkles } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { useParseText } from "../hooks/useAi";
+import type { AiProcessResult } from "@/types/domain";
 
 const SAMPLES = [
-  '20 cola arrived today, 5 ayran sold, 2kg meat used',
-  'Bought 10 cartons of milk, sold 3 bread',
-  'Received 50 boxes of water and used 8kg sugar',
+  "Ekmek oldim 200 ta",
+  "20 kola keldi, 5 ayran sotildi",
+  "200 ekmek geldi, 10 sut satildi",
 ];
 
 export const AiAssistantCard = () => {
-  const [text, setText] = useState('');
+  const [text, setText] = useState("");
   const parse = useParseText();
   const [result, setResult] = useState<AiProcessResult | null>(null);
 
@@ -34,14 +40,14 @@ export const AiAssistantCard = () => {
             AI text parser
           </CardTitle>
           <CardDescription>
-            Type a sentence as you would say to your Telegram bot. The AI extracts products and
-            updates inventory.
+            Type a sentence as you would say to your Telegram bot. Unknown
+            products are created automatically, then inventory is updated.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Textarea
             rows={4}
-            placeholder="e.g. 20 cola arrived today, 5 ayran sold, 2kg meat used"
+            placeholder="e.g. Ekmek oldim 200 ta"
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
@@ -59,8 +65,13 @@ export const AiAssistantCard = () => {
             ))}
           </div>
 
-          <Button onClick={handleSubmit} disabled={parse.isPending || !text.trim()}>
-            {parse.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button
+            onClick={handleSubmit}
+            disabled={parse.isPending || !text.trim()}
+          >
+            {parse.isPending && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
             Process message
           </Button>
         </CardContent>
@@ -79,7 +90,9 @@ export const AiAssistantCard = () => {
           ) : (
             <div className="space-y-4 text-sm">
               {result.summary && (
-                <p className="rounded-md border bg-muted/30 p-3">{result.summary}</p>
+                <p className="rounded-md border bg-muted/30 p-3">
+                  {result.summary}
+                </p>
               )}
 
               {result.recordResults.length > 0 && (
@@ -89,12 +102,22 @@ export const AiAssistantCard = () => {
                   </p>
                   <ul className="space-y-1">
                     {result.recordResults
-                      .filter((r) => r.status === 'ok')
+                      .filter((r) => r.status === "ok")
                       .map((r, idx) => (
-                        <li key={idx} className="flex items-center justify-between">
+                        <li
+                          key={idx}
+                          className="flex items-center justify-between"
+                        >
                           <span>{r.transaction.productName}</span>
-                          <Badge variant={r.transaction.type === 'in' ? 'success' : 'destructive'}>
-                            {r.transaction.type} {r.transaction.quantity} {r.transaction.unit}
+                          <Badge
+                            variant={
+                              r.transaction.type === "in"
+                                ? "success"
+                                : "destructive"
+                            }
+                          >
+                            {r.transaction.type} {r.transaction.quantity}{" "}
+                            {r.transaction.unit}
                           </Badge>
                         </li>
                       ))}
@@ -102,14 +125,38 @@ export const AiAssistantCard = () => {
                 </div>
               )}
 
+              {(result.createdProducts?.length ?? 0) > 0 && (
+                <div>
+                  <p className="mb-2 text-xs font-medium uppercase text-primary">
+                    New products created
+                  </p>
+                  <ul className="space-y-1">
+                    {result.createdProducts.map((c, idx) => (
+                      <li
+                        key={idx}
+                        className="flex items-center justify-between"
+                      >
+                        <span className="font-medium">{c.name}</span>
+                        <Badge variant="success">
+                          {c.type} {c.quantity} {c.unit}
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {result.unresolved.length > 0 && (
                 <div>
                   <p className="mb-2 text-xs font-medium uppercase text-warning">
-                    Unresolved products
+                    Could not process
                   </p>
                   <ul className="space-y-1">
                     {result.unresolved.map((u, idx) => (
-                      <li key={idx} className="flex items-center justify-between">
+                      <li
+                        key={idx}
+                        className="flex items-center justify-between"
+                      >
                         <span className="capitalize">{u.product}</span>
                         <Badge variant="warning">
                           {u.quantity} {u.unit}
