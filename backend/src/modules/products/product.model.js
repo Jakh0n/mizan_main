@@ -12,7 +12,16 @@ const productSchema = new mongoose.Schema(
       index: true,
     },
     name: { type: String, required: true, trim: true, maxlength: 160 },
-    sku: { type: String, trim: true, uppercase: true, maxlength: 64 },
+    sku: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      maxlength: 64,
+      set: (value) => {
+        const normalized = String(value || '').trim();
+        return normalized ? normalized : undefined;
+      },
+    },
     category: { type: String, trim: true, maxlength: 64, index: true },
     unit: { type: String, enum: UNIT_VALUES, default: UNITS.PIECE },
     price: { type: Number, default: 0, min: 0 },
@@ -28,7 +37,15 @@ const productSchema = new mongoose.Schema(
 );
 
 productSchema.index({ workspaceId: 1, name: 1 }, { unique: true });
-productSchema.index({ workspaceId: 1, sku: 1 }, { unique: true, sparse: true });
+productSchema.index(
+  { workspaceId: 1, sku: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      sku: { $exists: true, $type: 'string', $nin: ['', null] },
+    },
+  }
+);
 productSchema.index({ name: 'text', aliases: 'text', category: 'text' });
 
 productSchema.virtual('isLowStock').get(function isLowStock() {

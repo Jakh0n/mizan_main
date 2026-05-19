@@ -114,6 +114,7 @@ export interface AiProcessResult {
   transcript: string;
   language: string;
   summary: string;
+  warnings: string[];
   parsedItems: Array<{
     product: string;
     type: TransactionType;

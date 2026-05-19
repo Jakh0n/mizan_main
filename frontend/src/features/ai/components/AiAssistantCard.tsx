@@ -95,6 +95,19 @@ export const AiAssistantCard = () => {
                 </p>
               )}
 
+              {result.warnings.length > 0 && (
+                <div className="rounded-md border border-warning/40 bg-warning/10 p-3">
+                  <p className="mb-1 text-xs font-medium uppercase text-warning">
+                    Parsing warnings
+                  </p>
+                  <ul className="space-y-1 text-xs text-warning">
+                    {result.warnings.map((warning, idx) => (
+                      <li key={idx}>• {warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {result.recordResults.length > 0 && (
                 <div>
                   <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">

@@ -66,12 +66,14 @@ const processTranscript = async ({
     recorded: recordResults.filter((r) => r.status === "ok").length,
     created: createdProducts.length,
     unresolved: unresolved.length,
+    warnings: (parsed.warnings || []).length,
   });
 
   return {
     transcript: text,
     language: parsed.language,
     summary: parsed.summary,
+    warnings: parsed.warnings || [],
     parsedItems: parsed.items,
     recordResults,
     createdProducts,
