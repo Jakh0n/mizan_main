@@ -3,6 +3,21 @@
 const mongoose = require('mongoose');
 const { UNIT_VALUES, UNITS } = require('../../constants/inventory');
 
+const PRODUCTION_FIELD_TYPES = ['text', 'number', 'select'];
+
+const productionFieldSchema = new mongoose.Schema(
+  {
+    key: { type: String, required: true, trim: true, maxlength: 40 },
+    label: { type: String, required: true, trim: true, maxlength: 80 },
+    type: { type: String, enum: PRODUCTION_FIELD_TYPES, default: 'text' },
+    required: { type: Boolean, default: false },
+    placeholder: { type: String, trim: true, maxlength: 80 },
+    unit: { type: String, trim: true, maxlength: 16 },
+    options: { type: [String], default: [] },
+  },
+  { _id: false }
+);
+
 const productSchema = new mongoose.Schema(
   {
     workspaceId: {
@@ -31,6 +46,7 @@ const productSchema = new mongoose.Schema(
     barcode: { type: String, trim: true, sparse: true, index: true },
     description: { type: String, maxlength: 1000 },
     aliases: { type: [String], default: [] },
+    productionFields: { type: [productionFieldSchema], default: [] },
     isArchived: { type: Boolean, default: false, index: true },
   },
   { timestamps: true }

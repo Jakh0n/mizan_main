@@ -5,6 +5,16 @@ const { UNIT_VALUES } = require('../../constants/inventory');
 
 const objectId = Joi.string().regex(/^[0-9a-fA-F]{24}$/).message('Invalid id');
 
+const productionField = Joi.object({
+  key: Joi.string().min(1).max(40).required(),
+  label: Joi.string().min(1).max(80).required(),
+  type: Joi.string().valid('text', 'number', 'select').default('text'),
+  required: Joi.boolean().default(false),
+  placeholder: Joi.string().max(80).allow('', null),
+  unit: Joi.string().max(16).allow('', null),
+  options: Joi.array().items(Joi.string().max(80)).default([]),
+});
+
 const create = {
   body: Joi.object({
     name: Joi.string().min(1).max(160).required(),
@@ -18,6 +28,7 @@ const create = {
     barcode: Joi.string().max(64).allow('', null),
     description: Joi.string().max(1000).allow('', null),
     aliases: Joi.array().items(Joi.string().max(80)).default([]),
+    productionFields: Joi.array().items(productionField).default([]),
   }),
 };
 
@@ -34,6 +45,7 @@ const update = {
     barcode: Joi.string().max(64).allow('', null),
     description: Joi.string().max(1000).allow('', null),
     aliases: Joi.array().items(Joi.string().max(80)),
+    productionFields: Joi.array().items(productionField),
   }).min(1),
 };
 

@@ -37,6 +37,18 @@ export interface User {
   updatedAt: string;
 }
 
+export type ProductionFieldType = 'text' | 'number' | 'select';
+
+export interface ProductionFieldDefinition {
+  key: string;
+  label: string;
+  type: ProductionFieldType;
+  required: boolean;
+  placeholder?: string;
+  unit?: string;
+  options?: string[];
+}
+
 export interface Product {
   _id: string;
   workspaceId: string;
@@ -51,6 +63,7 @@ export interface Product {
   barcode?: string;
   description?: string;
   aliases: string[];
+  productionFields?: ProductionFieldDefinition[];
   isArchived: boolean;
   isLowStock?: boolean;
   createdAt: string;

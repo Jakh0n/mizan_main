@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -16,8 +17,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { UNITS } from '@/lib/constants';
-import type { Product, Unit } from '@/types/domain';
+import type { Product, ProductionFieldDefinition, Unit } from '@/types/domain';
 import type { ProductPayload } from '@/services/products.service';
+import { ProductionFieldsEditor } from './ProductionFieldsEditor';
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required').max(160),
@@ -79,6 +81,10 @@ export const ProductForm = ({
     },
   });
 
+  const [productionFields, setProductionFields] = useState<ProductionFieldDefinition[]>(
+    product?.productionFields ?? []
+  );
+
   const submit = (values: FormOutput) => {
     const payload: ProductPayload = {
       name: values.name,
@@ -92,6 +98,16 @@ export const ProductForm = ({
       barcode: values.barcode || undefined,
       description: values.description || undefined,
       aliases: toAliasesArray(values.aliases),
+      productionFields: productionFields
+        .filter((field) => field.label.trim().length > 0)
+        .map((field) => ({
+          ...field,
+          key: field.key?.trim() || field.label.toLowerCase().replace(/\s+/g, '_'),
+          label: field.label.trim(),
+          placeholder: field.placeholder?.trim() || undefined,
+          unit: field.unit?.trim() || undefined,
+          options: field.type === 'select' ? field.options ?? [] : [],
+        })),
     };
     onSubmit(payload);
   };
@@ -182,6 +198,10 @@ export const ProductForm = ({
         <div className="col-span-2 space-y-2">
           <Label htmlFor="description">Description</Label>
           <Textarea id="description" rows={3} {...register('description')} />
+        </div>
+
+        <div className="col-span-2">
+          <ProductionFieldsEditor value={productionFields} onChange={setProductionFields} />
         </div>
       </div>
 

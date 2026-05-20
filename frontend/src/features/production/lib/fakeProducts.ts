@@ -1,4 +1,4 @@
-import type { Product } from '@/types/domain';
+import type { Product, ProductionFieldDefinition } from '@/types/domain';
 
 const now = new Date().toISOString();
 
@@ -6,7 +6,8 @@ const buildFake = (
   id: string,
   name: string,
   category: string,
-  stock: number
+  stock: number,
+  productionFields: ProductionFieldDefinition[] = []
 ): Product => ({
   _id: id,
   workspaceId: 'demo',
@@ -18,6 +19,7 @@ const buildFake = (
   stock,
   lowStockThreshold: 5,
   aliases: [],
+  productionFields,
   isArchived: false,
   isLowStock: stock <= 5,
   createdAt: now,
@@ -25,8 +27,33 @@ const buildFake = (
 });
 
 export const FAKE_PRODUCTS: Product[] = [
-  buildFake('demo-beef-patty', 'Beef Patty', 'Proteins', 142),
-  buildFake('demo-pizza-dough', 'Pizza Dough', 'Bakery', 24),
+  buildFake('demo-beef-patty', 'Beef Patty', 'Proteins', 142, [
+    {
+      key: 'weight_per_piece',
+      label: 'Weight per piece',
+      type: 'number',
+      required: true,
+      unit: 'g',
+      placeholder: '120',
+    },
+    {
+      key: 'doneness',
+      label: 'Doneness',
+      type: 'select',
+      required: false,
+      options: ['Rare', 'Medium', 'Well done'],
+    },
+  ]),
+  buildFake('demo-pizza-dough', 'Pizza Dough', 'Bakery', 24, [
+    {
+      key: 'hydration',
+      label: 'Hydration',
+      type: 'number',
+      required: false,
+      unit: '%',
+      placeholder: '65',
+    },
+  ]),
   buildFake('demo-special-sauce', 'Special Sauce', 'Sauces', 12),
   buildFake('demo-brioche-bun', 'Brioche Bun', 'Bakery', 60),
   buildFake('demo-grated-cheese', 'Grated Cheese', 'Dairy', 30),

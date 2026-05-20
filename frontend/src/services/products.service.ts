@@ -1,6 +1,6 @@
 import { http } from './http';
 import type { ApiResponse, Pagination } from '@/types/api';
-import type { Product, Unit } from '@/types/domain';
+import type { Product, ProductionFieldDefinition, Unit } from '@/types/domain';
 
 export interface ProductListQuery {
   page?: number;
@@ -22,6 +22,7 @@ export interface ProductPayload {
   barcode?: string;
   description?: string;
   aliases?: string[];
+  productionFields?: ProductionFieldDefinition[];
 }
 
 export interface ProductListResult {

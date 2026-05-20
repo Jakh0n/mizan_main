@@ -2,9 +2,14 @@
 
 import { Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import type { Product } from '@/types/domain';
+import type { DynamicFieldValues } from '../lib/fieldValues';
+import type { KeypadKey } from './QuantityKeypad';
 import { QuantityKeypad } from './QuantityKeypad';
 import { ThermalLabelPreview } from './ThermalLabelPreview';
+
+export type ActiveTarget = { kind: 'quantity' } | { kind: 'field'; key: string };
 
 interface ProductionSummaryProps {
   product: Product | null;
@@ -13,8 +18,12 @@ interface ProductionSummaryProps {
   productionDate: string;
   expirationDate: string;
   batchNumber: string;
+  fieldValues: DynamicFieldValues;
+  activeTarget: ActiveTarget;
   isSaving: boolean;
-  onQuantityChange: (next: number) => void;
+  onFieldChange: (key: string, value: string) => void;
+  onActivate: (target: ActiveTarget) => void;
+  onKeypadPress: (key: KeypadKey) => void;
   onPrint: () => void;
 }
 
@@ -25,11 +34,26 @@ export const ProductionSummary = ({
   productionDate,
   expirationDate,
   batchNumber,
+  fieldValues,
+  activeTarget,
   isSaving,
-  onQuantityChange,
+  onFieldChange,
+  onActivate,
+  onKeypadPress,
   onPrint,
 }: ProductionSummaryProps) => {
   const productLabel = product?.name ?? 'No item selected';
+  const productionFields = product?.productionFields ?? [];
+  const isQuantityActive = activeTarget.kind === 'quantity';
+
+  const activeField =
+    activeTarget.kind === 'field'
+      ? productionFields.find((field) => field.key === activeTarget.key) ?? null
+      : null;
+
+  const headerLabel = isQuantityActive
+    ? 'Enter quantity'
+    : `Filling: ${activeField?.label ?? ''}`;
 
   return (
     <aside className="flex h-full min-h-[700px] flex-col gap-5 rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
@@ -38,7 +62,11 @@ export const ProductionSummary = ({
           Labeling action
         </p>
         <h2 className="mt-1 text-2xl font-bold text-white">{productLabel}</h2>
-        <p className="text-xs text-slate-400">Thermal Preview</p>
+        <p className="text-xs text-slate-400">
+          {productionFields.length > 0
+            ? 'Tap a label row, then use the numpad.'
+            : 'Thermal Preview'}
+        </p>
       </div>
 
       <ThermalLabelPreview
@@ -48,16 +76,32 @@ export const ProductionSummary = ({
         operator={workerName}
         batchNumber={batchNumber}
         quantity={quantity}
+        productionFields={productionFields}
+        fieldValues={fieldValues}
+        activeFieldKey={activeTarget.kind === 'field' ? activeTarget.key : null}
+        onFieldChange={onFieldChange}
+        onActivateField={(key) => onActivate({ kind: 'field', key })}
       />
 
       <div className="space-y-2 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
-          Enter quantity
+          {headerLabel}
         </p>
-        <p className="text-5xl font-extrabold text-lime-400 tabular-nums">{quantity}</p>
+        <button
+          type="button"
+          onClick={() => onActivate({ kind: 'quantity' })}
+          className={cn(
+            'mx-auto block rounded-xl px-6 py-1 text-5xl font-extrabold tabular-nums transition-all',
+            isQuantityActive
+              ? 'text-lime-400 ring-2 ring-lime-400/40'
+              : 'text-slate-500 hover:text-lime-300'
+          )}
+        >
+          {quantity}
+        </button>
       </div>
 
-      <QuantityKeypad value={quantity} onChange={onQuantityChange} />
+      <QuantityKeypad onPress={onKeypadPress} />
 
       <div className="mt-auto">
         <Button

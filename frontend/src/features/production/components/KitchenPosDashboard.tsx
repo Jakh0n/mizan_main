@@ -11,8 +11,12 @@ import { useLogout } from '@/features/auth/hooks/useAuth';
 import { useAuthStore } from '@/store/auth.store';
 import type { Product } from '@/types/domain';
 import { FAKE_PRODUCTS, isFakeProductId } from '../lib/fakeProducts';
+import { buildLabelDetails, type LabelDetail } from '../lib/buildLabelDetails';
+import type { DynamicFieldValues } from '../lib/fieldValues';
 import { ProductTile } from './ProductTile';
+import type { ActiveTarget } from './ProductionSummary';
 import { ProductionSummary } from './ProductionSummary';
+import type { KeypadKey } from './QuantityKeypad';
 
 interface ProductionLabel {
   id: string;
@@ -22,7 +26,10 @@ interface ProductionLabel {
   expirationDate: string;
   workerName: string;
   batchNumber: string;
+  details: LabelDetail[];
 }
+
+const QUANTITY_MAX = 99999;
 
 const expiryDays = (product: Product): number => {
   const value = `${product.name} ${product.category ?? ''}`.toLowerCase();
@@ -30,18 +37,30 @@ const expiryDays = (product: Product): number => {
   if (value.includes('sauce')) return 3;
   if (value.includes('bread') || value.includes('bun') || value.includes('dough')) return 2;
   if (value.includes('rice')) return 2;
-  if (value.includes('chicken') || value.includes('meat') || value.includes('beef') || value.includes('doner')) return 2;
+  if (
+    value.includes('chicken') ||
+    value.includes('meat') ||
+    value.includes('beef') ||
+    value.includes('doner')
+  ) {
+    return 2;
+  }
   return 3;
 };
 
 const makeBatchNumber = (productName: string): string => {
-  const prefix = productName.replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase() || 'PROD';
+  const prefix =
+    productName
+      .replace(/[^a-zA-Z]/g, '')
+      .slice(0, 4)
+      .toUpperCase() || 'PROD';
   const timestamp = dayjs().format('YYMMDD-HHmm');
   const rand = Math.floor(100 + Math.random() * 900);
   return `${prefix}-${timestamp}-${rand}`;
 };
 
-const formatLabelDate = (date: dayjs.Dayjs): string => date.format('DD MMM YYYY HH:mm').toUpperCase();
+const formatLabelDate = (date: dayjs.Dayjs): string =>
+  date.format('DD MMM YYYY HH:mm').toUpperCase();
 
 const playFeedbackTone = () => {
   if (typeof window === 'undefined') return;
@@ -71,11 +90,30 @@ const playFeedbackTone = () => {
   }
 };
 
+const escapeHtml = (value: string): string =>
+  value.replace(/[&<>"']/g, (ch) => {
+    const map: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    };
+    return map[ch] ?? ch;
+  });
+
 const printLabel = (label: ProductionLabel): boolean => {
   if (typeof window === 'undefined') return false;
 
   const popup = window.open('', '_blank', 'width=420,height=620');
   if (!popup) return false;
+
+  const detailRows = label.details
+    .map(
+      (detail) =>
+        `<div class="row label-row"><strong>${escapeHtml(detail.label)}:</strong> ${escapeHtml(detail.value)}</div>`
+    )
+    .join('');
 
   popup.document.write(`
     <html>
@@ -95,11 +133,12 @@ const printLabel = (label: ProductionLabel): boolean => {
       <body>
         <div class="label">
           <div class="brand">KITCHENOS</div>
-          <div class="name">${label.productName} <span class="qty">${label.quantity}U</span></div>
-          <div class="row label-row"><strong>PREP:</strong> ${label.productionDate}</div>
-          <div class="row label-row"><strong>EXP:</strong> ${label.expirationDate}</div>
-          <div class="row label-row"><strong>OPERATOR:</strong> ${label.workerName}</div>
-          <div class="batch">${label.batchNumber}</div>
+          <div class="name">${escapeHtml(label.productName)} <span class="qty">${label.quantity}U</span></div>
+          <div class="row label-row"><strong>PREP:</strong> ${escapeHtml(label.productionDate)}</div>
+          <div class="row label-row"><strong>EXP:</strong> ${escapeHtml(label.expirationDate)}</div>
+          <div class="row label-row"><strong>OPERATOR:</strong> ${escapeHtml(label.workerName)}</div>
+          ${detailRows}
+          <div class="batch">${escapeHtml(label.batchNumber)}</div>
         </div>
       </body>
     </html>
@@ -111,6 +150,39 @@ const printLabel = (label: ProductionLabel): boolean => {
   return true;
 };
 
+const applyKeyToText = (
+  current: string,
+  key: KeypadKey,
+  opts: { allowDecimal: boolean }
+): string => {
+  if (key === 'CLEAR') return '';
+  if (key === 'BACK') return current.slice(0, -1);
+  if (key === '.') {
+    if (!opts.allowDecimal) return current;
+    if (current.includes('.')) return current;
+    return current === '' ? '0.' : `${current}.`;
+  }
+  if (current === '' || current === '0') return key;
+  return `${current}${key}`;
+};
+
+const buildActiveOrder = (product: Product | null): ActiveTarget[] => {
+  const fields = product?.productionFields ?? [];
+  return [
+    { kind: 'quantity' },
+    ...fields
+      .filter((field) => field.type !== 'select')
+      .map((field) => ({ kind: 'field' as const, key: field.key })),
+  ];
+};
+
+const findActiveIndex = (order: ActiveTarget[], current: ActiveTarget): number =>
+  order.findIndex((target) =>
+    current.kind === 'quantity'
+      ? target.kind === 'quantity'
+      : target.kind === 'field' && target.key === current.key
+  );
+
 export const KitchenPosDashboard = () => {
   const user = useAuthStore((s) => s.user);
   const workerName = user?.fullName ?? 'CHEF_A1';
@@ -121,6 +193,8 @@ export const KitchenPosDashboard = () => {
   const [batchNumber, setBatchNumber] = useState('BATCH-READY');
   const [productionDayjs, setProductionDayjs] = useState(() => dayjs());
   const [expirationDayjs, setExpirationDayjs] = useState(() => dayjs().add(2, 'day'));
+  const [fieldValues, setFieldValues] = useState<DynamicFieldValues>({});
+  const [activeTarget, setActiveTarget] = useState<ActiveTarget>({ kind: 'quantity' });
 
   const createTransaction = useCreateTransaction();
 
@@ -141,6 +215,73 @@ export const KitchenPosDashboard = () => {
     setProductionDayjs(prep);
     setExpirationDayjs(prep.add(expiryDays(product), 'day'));
     setBatchNumber(makeBatchNumber(product.name));
+
+    const defaults: DynamicFieldValues = {};
+    (product.productionFields ?? []).forEach((field) => {
+      defaults[field.key] = '';
+    });
+    setFieldValues(defaults);
+    setActiveTarget({ kind: 'quantity' });
+  };
+
+  const handleFieldChange = (key: string, value: string) => {
+    setFieldValues((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleAdvanceTarget = () => {
+    const order = buildActiveOrder(selectedProduct);
+    if (order.length <= 1) return;
+    const currentIndex = findActiveIndex(order, activeTarget);
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % order.length;
+    const nextTarget = order[nextIndex];
+    if (nextTarget) setActiveTarget(nextTarget);
+  };
+
+  const handleKeypadPress = (key: KeypadKey) => {
+    if (key === 'OK') {
+      handleAdvanceTarget();
+      return;
+    }
+
+    if (activeTarget.kind === 'quantity') {
+      const currentStr = quantity === 0 ? '' : quantity.toString();
+      const next = applyKeyToText(currentStr, key, { allowDecimal: false });
+      const parsed = next === '' ? 0 : Number(next);
+      if (!Number.isFinite(parsed)) return;
+      setQuantity(Math.min(parsed, QUANTITY_MAX));
+      return;
+    }
+
+    const fieldKey = activeTarget.key;
+    const field = selectedProduct?.productionFields?.find((f) => f.key === fieldKey);
+    if (!field || field.type === 'select') return;
+
+    const allowDecimal = field.type === 'number';
+    setFieldValues((prev) => ({
+      ...prev,
+      [fieldKey]: applyKeyToText(prev[fieldKey] ?? '', key, { allowDecimal }),
+    }));
+  };
+
+  const validateRequiredFields = (): string | null => {
+    const fields = selectedProduct?.productionFields ?? [];
+    const missing = fields
+      .filter((field) => field.required && !(fieldValues[field.key] ?? '').trim())
+      .map((field) => field.label);
+    return missing.length > 0 ? `Please fill: ${missing.join(', ')}` : null;
+  };
+
+  const serializeFieldValues = (): string => {
+    const fields = selectedProduct?.productionFields ?? [];
+    if (fields.length === 0) return '';
+    const parts = fields
+      .map((field) => {
+        const raw = fieldValues[field.key];
+        if (!raw) return null;
+        return `${field.label}: ${raw}${field.unit ? ` ${field.unit}` : ''}`;
+      })
+      .filter(Boolean);
+    return parts.length > 0 ? ` | ${parts.join(', ')}` : '';
   };
 
   const handlePrint = async () => {
@@ -153,6 +294,12 @@ export const KitchenPosDashboard = () => {
       return;
     }
 
+    const missing = validateRequiredFields();
+    if (missing) {
+      toast.error(missing);
+      return;
+    }
+
     const label: ProductionLabel = {
       id: crypto.randomUUID(),
       productName: selectedProduct.name,
@@ -161,6 +308,7 @@ export const KitchenPosDashboard = () => {
       expirationDate: formatLabelDate(expirationDayjs),
       workerName,
       batchNumber,
+      details: buildLabelDetails(selectedProduct, fieldValues),
     };
 
     if (isFakeProductId(selectedProduct._id)) {
@@ -174,12 +322,14 @@ export const KitchenPosDashboard = () => {
       return;
     }
 
+    const extraNote = serializeFieldValues();
+
     try {
       await createTransaction.mutateAsync({
         productId: selectedProduct._id,
         type: 'in',
         quantity,
-        note: `Kitchen batch ${batchNumber} | EXP ${label.expirationDate} | Worker ${workerName}`,
+        note: `Kitchen batch ${batchNumber} | EXP ${label.expirationDate} | Worker ${workerName}${extraNote}`,
       });
 
       const printed = printLabel(label);
@@ -190,6 +340,13 @@ export const KitchenPosDashboard = () => {
       playFeedbackTone();
       setQuantity(0);
       setBatchNumber(makeBatchNumber(selectedProduct.name));
+
+      const resetValues: DynamicFieldValues = {};
+      (selectedProduct.productionFields ?? []).forEach((field) => {
+        resetValues[field.key] = '';
+      });
+      setFieldValues(resetValues);
+      setActiveTarget({ kind: 'quantity' });
     } catch {
       // toast handled by mutation
     }
@@ -252,8 +409,12 @@ export const KitchenPosDashboard = () => {
           productionDate={formatLabelDate(productionDayjs)}
           expirationDate={formatLabelDate(expirationDayjs)}
           batchNumber={batchNumber}
+          fieldValues={fieldValues}
+          activeTarget={activeTarget}
           isSaving={createTransaction.isPending}
-          onQuantityChange={setQuantity}
+          onFieldChange={handleFieldChange}
+          onActivate={setActiveTarget}
+          onKeypadPress={handleKeypadPress}
           onPrint={handlePrint}
         />
       </div>
