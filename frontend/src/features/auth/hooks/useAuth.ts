@@ -7,6 +7,7 @@ import { authService, type LoginPayload, type RegisterPayload } from '@/services
 import { setTokens, clearTokens } from '@/services/http';
 import { useAuthStore } from '@/store/auth.store';
 import { extractApiError } from '@/hooks/useApiError';
+import { getDefaultRouteByRole } from '@/lib/roles';
 
 export const useCurrentUser = () => {
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -36,7 +37,7 @@ export const useLogin = () => {
       setAuth({ user: data.user, workspace: data.workspace });
       qc.invalidateQueries({ queryKey: ['auth', 'me'] });
       toast.success('Welcome back');
-      router.push('/dashboard');
+      router.push(getDefaultRouteByRole(data.user.role));
     },
     onError: (err) => toast.error(extractApiError(err)),
   });
@@ -54,7 +55,7 @@ export const useRegister = () => {
       setAuth({ user: data.user, workspace: data.workspace });
       qc.invalidateQueries({ queryKey: ['auth', 'me'] });
       toast.success('Account created');
-      router.push('/dashboard');
+      router.push(getDefaultRouteByRole(data.user.role));
     },
     onError: (err) => toast.error(extractApiError(err)),
   });

@@ -14,19 +14,19 @@ router.get('/', validate(validation.list), controller.list);
 router.get('/:id', validate(validation.getOne), controller.getOne);
 router.post(
   '/',
-  authorize(ROLES.OWNER, ROLES.MANAGER),
+  authorize(ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER),
   validate(validation.create),
   controller.create
 );
 router.patch(
   '/:id',
-  authorize(ROLES.OWNER, ROLES.MANAGER),
+  authorize(ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER),
   validate(validation.update),
   controller.update
 );
 router.delete(
   '/:id',
-  authorize(ROLES.OWNER, ROLES.MANAGER),
+  authorize(ROLES.ADMIN, ROLES.OWNER, ROLES.MANAGER),
   validate(validation.remove),
   controller.remove
 );

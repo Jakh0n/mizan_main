@@ -1,5 +1,5 @@
 import { AdminOverview } from '@/features/analytics/components/AdminOverview';
 
-export default function DashboardPage() {
+export default function AdminPage() {
   return <AdminOverview />;
 }

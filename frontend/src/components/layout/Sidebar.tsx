@@ -18,8 +18,8 @@ interface NavItem {
   icon: typeof LayoutDashboard;
 }
 
-const NAV: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+const ADMIN_NAV: NavItem[] = [
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/products', label: 'Products', icon: Package },
   { href: '/inventory', label: 'Inventory', icon: ArrowLeftRight },
   { href: '/ai', label: 'AI Assistant', icon: Sparkles },
@@ -43,9 +43,10 @@ export const Sidebar = () => {
       </div>
 
       <nav className="flex-1 space-y-1 p-3">
-        {NAV.map((item) => {
+        {ADMIN_NAV.map((item) => {
           const Icon = item.icon;
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active =
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.href}
@@ -66,7 +67,9 @@ export const Sidebar = () => {
 
       <div className="border-t p-4 text-xs text-muted-foreground">
         <p className="font-medium text-foreground">Need help?</p>
-        <p className="mt-1">Send a voice message to your Telegram bot to update inventory.</p>
+        <p className="mt-1">
+          Send a voice message to your Telegram bot to update inventory.
+        </p>
       </div>
     </aside>
   );

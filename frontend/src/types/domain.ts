@@ -1,6 +1,6 @@
 export type Unit = 'pcs' | 'kg' | 'g' | 'l' | 'ml' | 'box' | 'pack';
 
-export type Role = 'owner' | 'manager' | 'staff';
+export type Role = 'admin' | 'owner' | 'manager' | 'staff';
 
 export type Industry = 'restaurant' | 'cafe' | 'market' | 'warehouse' | 'other';
 
